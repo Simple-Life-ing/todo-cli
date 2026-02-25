@@ -20,3 +20,25 @@ pub fn save(todos: &Vec<Todo>) -> Result<()> {
     fs::write(FILE_PATH, data)?;
     Ok(())
 }
+
+/* Test Function */
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Todo;
+
+    #[test]
+    fn test_save_and_load() {
+        let todos = vec![Todo {
+            id: 1,
+            title: "test".into(),
+            completed: false,
+        }];
+
+        save(&todos).unwrap();
+        let loaded = load().unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].title, "test");
+    }
+}
