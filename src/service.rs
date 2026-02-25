@@ -1,6 +1,7 @@
 use crate::model::Todo;
 use crate::storage;
 use anyhow::{Result, anyhow};
+use colored::*;
 
 pub fn add(title: String) -> Result<()> {
     let mut todos = storage::load()?;
@@ -17,18 +18,41 @@ pub fn add(title: String) -> Result<()> {
     Ok(())
 }
 
-pub fn list() -> Result<()> {
+pub fn list(show_all: bool) -> Result<()> {
     let todos = storage::load()?;
 
     if todos.is_empty() {
-        println!("📭 暂无任务");
+        println!("{}", "📭 暂无任务".yellow());
         return Ok(());
     }
 
-    for todo in todos {
-        let status = if todo.completed { "✔" } else { " " };
-        println!("[{}] {} - {}", status, todo.id, todo.title);
+    let mut completed = 0;
+
+    for todo in &todos {
+        if !show_all && todo.completed {
+            continue;
+        }
+
+        let status = if todo.completed {
+            completed += 1;
+            "✔".green()
+        } else {
+            " ".normal()
+        };
+
+        println!(
+            "[{}] {} - {}",
+            status,
+            todo.id.to_string().cyan(),
+            if todo.completed {
+                todo.title.strikethrough()
+            } else {
+                todo.title.normal()
+            }
+        );
     }
+
+    println!("\n{} {}/{}", "完成进度:".blue(), completed, todos.len());
 
     Ok(())
 }

@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Add { title } => service::add(title)?,
-        Commands::List => service::list()?,
+        Commands::List { all } => service::list(all)?,
         Commands::Done { id } => service::done(id)?,
         Commands::Delete { id } => service::delete(id)?,
         Commands::Clear => service::clear()?,

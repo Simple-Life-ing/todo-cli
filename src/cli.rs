@@ -10,9 +10,18 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    Add { title: String },
-    List,
-    Done { id: usize },
-    Delete { id: usize },
+    Add {
+        title: String,
+    },
+    List {
+        #[arg(short, long)]
+        all: bool,
+    },
+    Done {
+        id: usize,
+    },
+    Delete {
+        id: usize,
+    },
     Clear,
 }
