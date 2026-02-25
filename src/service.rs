@@ -1,10 +1,9 @@
 use crate::model::Todo;
 use crate::storage;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub fn add(title: String) -> Result<()> {
     let mut todos = storage::load()?;
-
     let id = todos.len() + 1;
 
     todos.push(Todo {
@@ -14,17 +13,62 @@ pub fn add(title: String) -> Result<()> {
     });
 
     storage::save(&todos)?;
-    println!("添加成功");
+    println!("✅ 添加成功");
     Ok(())
 }
 
 pub fn list() -> Result<()> {
     let todos = storage::load()?;
 
+    if todos.is_empty() {
+        println!("📭 暂无任务");
+        return Ok(());
+    }
+
     for todo in todos {
         let status = if todo.completed { "✔" } else { " " };
         println!("[{}] {} - {}", status, todo.id, todo.title);
     }
 
+    Ok(())
+}
+
+pub fn done(id: usize) -> Result<()> {
+    let mut todos = storage::load()?;
+
+    let todo = todos
+        .iter_mut()
+        .find(|t| t.id == id)
+        .ok_or(anyhow!("未找到该任务"))?;
+
+    todo.completed = true;
+
+    storage::save(&todos)?;
+    println!("🎉 任务已完成");
+    Ok(())
+}
+
+pub fn delete(id: usize) -> Result<()> {
+    let mut todos = storage::load()?;
+
+    if id == 0 || id > todos.len() {
+        return Err(anyhow!("任务不存在"));
+    }
+
+    todos.remove(id - 1);
+
+    // 重新排序 id
+    for (index, todo) in todos.iter_mut().enumerate() {
+        todo.id = index + 1;
+    }
+
+    storage::save(&todos)?;
+    println!("🗑 删除成功");
+    Ok(())
+}
+
+pub fn clear() -> Result<()> {
+    storage::save(&vec![])?;
+    println!("🧹 已清空所有任务");
     Ok(())
 }

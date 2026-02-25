@@ -12,7 +12,9 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Add { title } => service::add(title)?,
         Commands::List => service::list()?,
-        _ => println!("功能开发中"),
+        Commands::Done { id } => service::done(id)?,
+        Commands::Delete { id } => service::delete(id)?,
+        Commands::Clear => service::clear()?,
     }
 
     Ok(())
