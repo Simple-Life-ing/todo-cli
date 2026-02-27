@@ -2,6 +2,7 @@ use crate::model::Todo;
 use crate::storage;
 //use anyhow::{Result, anyhow};
 use colored::*;
+use rusqlite::Connection;
 
 pub fn add(title: String) -> anyhow::Result<()> {
     let conn = storage::get_connection()?;
@@ -86,8 +87,34 @@ pub fn delete(id: usize) -> anyhow::Result<()> {
 }
 
 pub fn clear() -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-    conn.execute("DELETE FROM todos", [])?;
+    let mut conn = storage::get_connection()?;
+    let tx = conn.transaction()?;
+
+    tx.execute("DELETE FROM todos", [])?;
+
+    tx.commit()?; //提交事务
+
     println!("🧹 已清空");
+    Ok(())
+}
+
+pub fn reset() -> anyhow::Result<()> {
+    let mut conn = storage::get_connection()?;
+    let tx = conn.transaction()?;
+
+    tx.execute("DROP TABLE IF EXISTS todos", [])?;
+
+    tx.execute(
+        "CREATE TABLE todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            completed BOOLEAN NOT NULL
+        )",
+        [],
+    )?;
+
+    tx.commit()?;
+
+    println!("{}", "🔄 数据库已重置".red());
     Ok(())
 }

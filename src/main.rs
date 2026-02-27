@@ -15,6 +15,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Done { id } => service::done(id)?,
         Commands::Delete { id } => service::delete(id)?,
         Commands::Clear => service::clear()?,
+        Commands::Reset => service::reset()?,
     }
 
     Ok(())

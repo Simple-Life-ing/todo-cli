@@ -24,4 +24,5 @@ pub enum Commands {
         id: usize,
     },
     Clear,
+    Reset,
 }
