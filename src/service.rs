@@ -1,98 +1,93 @@
 use crate::model::Todo;
 use crate::storage;
-use anyhow::{Result, anyhow};
+//use anyhow::{Result, anyhow};
 use colored::*;
 
-pub fn add(title: String) -> Result<()> {
-    let mut todos = storage::load()?;
-    let id = todos.len() + 1;
+pub fn add(title: String) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
 
-    todos.push(Todo {
-        id,
-        title,
-        completed: false,
-    });
+    conn.execute(
+        "INSERT INTO todos (title, completed) VALUES (?1, 0)",
+        [&title],
+    )?;
 
-    storage::save(&todos)?;
     println!("✅ 添加成功");
     Ok(())
 }
 
-pub fn list(show_all: bool) -> Result<()> {
-    let todos = storage::load()?;
+pub fn list(show_all: bool) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
 
-    if todos.is_empty() {
-        println!("{}", "📭 暂无任务".yellow());
-        return Ok(());
-    }
+    let mut stmt = if show_all {
+        conn.prepare("SELECT id, title, completed FROM todos")?
+    } else {
+        conn.prepare("SELECT id, title, completed FROM todos WHERE completed = 0")?
+    };
 
-    let mut completed = 0;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, bool>(2)?,
+        ))
+    })?;
 
-    for todo in &todos {
-        if !show_all && todo.completed {
-            continue;
+    let mut total = 0;
+    let mut completed_count = 0;
+
+    for row in rows {
+        let (id, title, completed) = row?;
+        total += 1;
+
+        if completed {
+            completed_count += 1;
         }
 
-        let status = if todo.completed {
-            completed += 1;
+        let status = if completed {
             "✔".green()
         } else {
             " ".normal()
         };
 
-        println!(
-            "[{}] {} - {}",
-            status,
-            todo.id.to_string().cyan(),
-            if todo.completed {
-                todo.title.strikethrough()
-            } else {
-                todo.title.normal()
-            }
-        );
+        let title_display = if completed {
+            title.strikethrough()
+        } else {
+            title.normal()
+        };
+
+        println!("[{}] {} - {}", status, id.to_string().cyan(), title_display);
     }
 
-    println!("\n{} {}/{}", "完成进度:".blue(), completed, todos.len());
+    if total == 0 {
+        println!("{}", "📭 暂无任务".yellow());
+    } else {
+        println!("\n{} {}/{}", "完成进度:".blue(), completed_count, total);
+    }
 
     Ok(())
 }
 
-pub fn done(id: usize) -> Result<()> {
-    let mut todos = storage::load()?;
+pub fn done(id: usize) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
 
-    let todo = todos
-        .iter_mut()
-        .find(|t| t.id == id)
-        .ok_or(anyhow!("未找到该任务"))?;
+    conn.execute("UPDATE todos SET completed = 1 WHERE id = ?1", [id])?;
 
-    todo.completed = true;
-
-    storage::save(&todos)?;
     println!("🎉 任务已完成");
     Ok(())
 }
 
-pub fn delete(id: usize) -> Result<()> {
-    let mut todos = storage::load()?;
+pub fn delete(id: usize) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
 
-    if id == 0 || id > todos.len() {
-        return Err(anyhow!("任务不存在"));
-    }
+    conn.execute("DELETE FROM todos WHERE id = ?1", [id])?;
 
-    todos.remove(id - 1);
-
-    // 重新排序 id
-    for (index, todo) in todos.iter_mut().enumerate() {
-        todo.id = index + 1;
-    }
-
-    storage::save(&todos)?;
     println!("🗑 删除成功");
     Ok(())
 }
 
-pub fn clear() -> Result<()> {
-    storage::save(&vec![])?;
-    println!("🧹 已清空所有任务");
+pub fn clear() -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
+    conn.execute("DELETE FROM todos", [])?;
+    println!("🧹 已清空");
     Ok(())
 }
