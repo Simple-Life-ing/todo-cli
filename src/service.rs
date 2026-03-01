@@ -16,6 +16,29 @@ pub fn add(title: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn batch_add(titles: Vec<String>) -> anyhow::Result<()> {
+    if titles.is_empty() {
+        println!("{}", "⚠️  没有提供任务标题".yellow());
+        return Ok(());
+    }
+
+    let mut conn = storage::get_connection()?;
+    let tx = conn.transaction()?;
+
+    {
+        let mut stmt = tx.prepare("INSERT INTO todos (title, completed) VALUES (?1, 0)")?;
+
+        for title in titles {
+            stmt.execute([title])?;
+        }
+    }
+
+    tx.commit()?;
+
+    println!("{}", "✅ 批量添加完成".green());
+    Ok(())
+}
+
 pub fn list(show_all: bool) -> anyhow::Result<()> {
     let conn = storage::get_connection()?;
 

@@ -16,6 +16,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Delete { id } => service::delete(id)?,
         Commands::Clear => service::clear()?,
         Commands::Reset => service::reset()?,
+        Commands::Batch { titles } => service::batch_add(titles)?,
     }
 
     Ok(())

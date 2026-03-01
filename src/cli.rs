@@ -25,4 +25,7 @@ pub enum Commands {
     },
     Clear,
     Reset,
+    Batch {
+        titles: Vec<String>,
+    },
 }
