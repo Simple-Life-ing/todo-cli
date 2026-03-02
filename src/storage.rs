@@ -23,6 +23,8 @@ pub fn get_connection() -> Result<Connection> {
         [],
     )?;
 
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_title ON todos(title)", [])?;
+
     Ok(conn)
 }
 /* Test Function */

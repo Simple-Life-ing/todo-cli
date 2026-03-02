@@ -17,6 +17,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Clear => service::clear()?,
         Commands::Reset => service::reset()?,
         Commands::Batch { titles } => service::batch_add(titles)?,
+        Commands::Search { keyword } => service::search(keyword)?,
     }
 
     Ok(())

@@ -100,6 +100,41 @@ pub fn done(id: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn search(keyword: String) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT id, title, completed 
+         FROM todos 
+         WHERE title LIKE ?1",
+    )?;
+
+    let pattern = format!("%{}%", keyword);
+
+    let todos = stmt.query_map([pattern], |row| {
+        Ok((
+            row.get::<_, i32>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, bool>(2)?,
+        ))
+    })?;
+
+    println!("{}", "🔍 搜索结果:".blue());
+
+    for todo in todos {
+        let (id, title, completed) = todo?;
+        let status = if completed {
+            "✔".green()
+        } else {
+            " ".normal()
+        };
+
+        println!("[{}] {} - {}", status, id.to_string().cyan(), title);
+    }
+
+    Ok(())
+}
+
 pub fn delete(id: usize) -> anyhow::Result<()> {
     let conn = storage::get_connection()?;
 

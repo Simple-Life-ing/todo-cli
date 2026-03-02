@@ -28,4 +28,7 @@ pub enum Commands {
     Batch {
         titles: Vec<String>,
     },
+    Search {
+        keyword: String,
+    },
 }
