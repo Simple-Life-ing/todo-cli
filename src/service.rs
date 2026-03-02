@@ -167,6 +167,49 @@ pub fn export_json(path: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn import_json(path: String, preserve_id: bool) -> Result<()> {
+    let content = std::fs::read_to_string(&path)?;
+    let todos: Vec<Todo> = serde_json::from_str(&content)?;
+
+    if todos.is_empty() {
+        println!("{}", "文件中没有数据".yellow());
+        return Ok(());
+    }
+
+    let mut conn = storage::get_connection()?;
+    let tx = conn.transaction()?;
+
+    tx.execute("DELETE FROM todos", [])?;
+
+    if preserve_id {
+        let mut stmt = tx.prepare(
+            "INSERT OR REPLACE INTO todos (id, title, completed)
+             VALUES (?1, ?2, ?3)",
+        )?;
+
+        for todo in todos {
+            stmt.execute((todo.id, todo.title, todo.completed))?;
+        }
+
+        // 重置 AUTOINCREMENT 计数
+        tx.execute("DELETE FROM sqlite_sequence WHERE name='todos'", [])?;
+    } else {
+        let mut stmt = tx.prepare(
+            "INSERT INTO todos (title, completed)
+             VALUES (?1, ?2)",
+        )?;
+
+        for todo in todos {
+            stmt.execute((todo.title, todo.completed))?;
+        }
+    }
+
+    tx.commit()?;
+
+    println!("{}", "📥 导入完成".green());
+    Ok(())
+}
+
 pub fn delete(id: usize) -> anyhow::Result<()> {
     let conn = storage::get_connection()?;
 

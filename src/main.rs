@@ -19,6 +19,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Batch { titles } => service::batch_add(titles)?,
         Commands::Search { keyword } => service::search(keyword)?,
         Commands::Export { path } => service::export_json(path)?,
+        Commands::Import { path, preserve_id } => service::import_json(path, preserve_id)?,
     }
 
     Ok(())

@@ -34,4 +34,10 @@ pub enum Commands {
     Export {
         path: String,
     },
+    Import {
+        path: String,
+
+        #[arg(long)]
+        preserve_id: bool,
+    },
 }
