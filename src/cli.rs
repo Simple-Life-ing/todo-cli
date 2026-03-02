@@ -31,4 +31,7 @@ pub enum Commands {
     Search {
         keyword: String,
     },
+    Export {
+        path: String,
+    },
 }

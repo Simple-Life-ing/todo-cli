@@ -142,6 +142,31 @@ pub fn search(keyword: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn export_json(path: String) -> anyhow::Result<()> {
+    let conn = storage::get_connection()?;
+
+    let mut stmt = conn.prepare("SELECT id, title, completed FROM todos")?;
+
+    let todos = stmt.query_map([], |row| {
+        Ok(Todo {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            completed: row.get(2)?,
+        })
+    })?;
+
+    let mut vec = vec![];
+
+    for todo in todos {
+        vec.push(todo?);
+    }
+
+    std::fs::write(&path, serde_json::to_string_pretty(&vec)?)?;
+
+    println!("{}", "📤 导出成功".green());
+    Ok(())
+}
+
 pub fn delete(id: usize) -> anyhow::Result<()> {
     let conn = storage::get_connection()?;
 

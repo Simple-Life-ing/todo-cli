@@ -18,6 +18,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Reset => service::reset()?,
         Commands::Batch { titles } => service::batch_add(titles)?,
         Commands::Search { keyword } => service::search(keyword)?,
+        Commands::Export { path } => service::export_json(path)?,
     }
 
     Ok(())
