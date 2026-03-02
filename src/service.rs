@@ -1,6 +1,6 @@
 use crate::model::Todo;
 use crate::storage;
-//use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow};
 use colored::*;
 use rusqlite::Connection;
 
@@ -48,38 +48,40 @@ pub fn list(show_all: bool) -> anyhow::Result<()> {
         conn.prepare("SELECT id, title, completed FROM todos WHERE completed = 0")?
     };
 
-    let rows = stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, bool>(2)?,
-        ))
+    let todos = stmt.query_map([], |row| {
+        Ok(Todo {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            completed: row.get(2)?,
+        })
     })?;
 
     let mut total = 0;
     let mut completed_count = 0;
 
-    for row in rows {
-        let (id, title, completed) = row?;
+    for todo in todos {
+        let todo = todo?;
         total += 1;
 
-        if completed {
+        let status = if todo.completed {
             completed_count += 1;
-        }
-
-        let status = if completed {
             "✔".green()
         } else {
             " ".normal()
         };
 
-        let title_display = if completed {
-            title.strikethrough()
+        let title_display = if todo.completed {
+            todo.title.strikethrough()
         } else {
-            title.normal()
+            todo.title.normal()
         };
 
-        println!("[{}] {} - {}", status, id.to_string().cyan(), title_display);
+        println!(
+            "[{}] {} - {}",
+            status,
+            todo.id.to_string().cyan(),
+            title_display
+        );
     }
 
     if total == 0 {
@@ -112,24 +114,29 @@ pub fn search(keyword: String) -> anyhow::Result<()> {
     let pattern = format!("%{}%", keyword);
 
     let todos = stmt.query_map([pattern], |row| {
-        Ok((
-            row.get::<_, i32>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, bool>(2)?,
-        ))
+        Ok(crate::model::Todo {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            completed: row.get(2)?,
+        })
     })?;
 
     println!("{}", "🔍 搜索结果:".blue());
 
     for todo in todos {
-        let (id, title, completed) = todo?;
-        let status = if completed {
+        let todo = todo?;
+        let status = if todo.completed {
             "✔".green()
         } else {
             " ".normal()
         };
 
-        println!("[{}] {} - {}", status, id.to_string().cyan(), title);
+        println!(
+            "[{}] {} - {}",
+            status,
+            todo.id.to_string().cyan(),
+            todo.title
+        );
     }
 
     Ok(())
