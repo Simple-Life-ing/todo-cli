@@ -98,7 +98,11 @@ pub fn done(id: usize) -> anyhow::Result<()> {
 
     conn.execute("UPDATE todos SET completed = 1 WHERE id = ?1", [id])?;
 
-    println!("🎉 任务已完成");
+    if conn.changes() == 0 {
+        println!("{}", format!("⚠️  ID {} 不存在", id).yellow());
+    } else {
+        println!("🎉 任务已完成");
+    }
     Ok(())
 }
 
@@ -215,7 +219,11 @@ pub fn delete(id: usize) -> anyhow::Result<()> {
 
     conn.execute("DELETE FROM todos WHERE id = ?1", [id])?;
 
-    println!("🗑 删除成功");
+    if conn.changes() == 0 {
+        println!("{}", format!("⚠️  ID {} 不存在", id).yellow());
+    } else {
+        println!("🗑 删除成功");
+    }
     Ok(())
 }
 
