@@ -1,12 +1,50 @@
 use crate::model::Todo;
-use crate::storage;
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use colored::*;
 use rusqlite::Connection;
 
-pub fn add(title: String) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
+/// All service functions now take a database connection reference so
+/// the caller (e.g. `main`) owns the connection. This decouples the
+/// database acquisition from business logic, making the latter
+/// easier to test and swap out.
 
+/// Helper: Print a single todo with colored formatting
+fn print_todo(todo: &Todo) {
+    let status = if todo.completed {
+        "✔".green()
+    } else {
+        " ".normal()
+    };
+
+    let title_display = if todo.completed {
+        todo.title.strikethrough()
+    } else {
+        todo.title.normal()
+    };
+
+    println!(
+        "[{}] {} - {}",
+        status,
+        todo.id.to_string().cyan(),
+        title_display
+    );
+}
+
+/// Helper: Print todos iterator and return (total, completed)
+fn print_todos<I: Iterator<Item = Todo>>(iter: I) -> (usize, usize) {
+    let mut total = 0usize;
+    let mut completed = 0usize;
+
+    for todo in iter {
+        if todo.completed { completed += 1; }
+        total += 1;
+        print_todo(&todo);
+    }
+
+    (total, completed)
+}
+
+pub fn add(conn: &Connection, title: String) -> anyhow::Result<()> {
     conn.execute(
         "INSERT INTO todos (title, completed) VALUES (?1, 0)",
         [&title],
@@ -16,13 +54,12 @@ pub fn add(title: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn batch_add(titles: Vec<String>) -> anyhow::Result<()> {
+pub fn batch_add(conn: &mut Connection, titles: Vec<String>) -> anyhow::Result<()> {
     if titles.is_empty() {
         println!("{}", "⚠️  没有提供任务标题".yellow());
         return Ok(());
     }
 
-    let mut conn = storage::get_connection()?;
     let tx = conn.transaction()?;
 
     {
@@ -39,63 +76,35 @@ pub fn batch_add(titles: Vec<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn list(show_all: bool) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-
+pub fn list(conn: &Connection, show_all: bool) -> anyhow::Result<()> {
     let mut stmt = if show_all {
         conn.prepare("SELECT id, title, completed FROM todos")?
     } else {
         conn.prepare("SELECT id, title, completed FROM todos WHERE completed = 0")?
     };
 
-    let todos = stmt.query_map([], |row| {
-        Ok(Todo {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            completed: row.get(2)?,
-        })
-    })?;
+    // collect all rows into a Vec<Todo>
+    let todos: Vec<Todo> = stmt
+        .query_map([], |row| {
+            Ok(Todo {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                completed: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let mut total = 0;
-    let mut completed_count = 0;
-
-    for todo in todos {
-        let todo = todo?;
-        total += 1;
-
-        let status = if todo.completed {
-            completed_count += 1;
-            "✔".green()
-        } else {
-            " ".normal()
-        };
-
-        let title_display = if todo.completed {
-            todo.title.strikethrough()
-        } else {
-            todo.title.normal()
-        };
-
-        println!(
-            "[{}] {} - {}",
-            status,
-            todo.id.to_string().cyan(),
-            title_display
-        );
-    }
-
-    if total == 0 {
+    if todos.is_empty() {
         println!("{}", "📭 暂无任务".yellow());
     } else {
+        let (total, completed_count) = print_todos(todos.into_iter());
         println!("\n{} {}/{}", "完成进度:".blue(), completed_count, total);
     }
 
     Ok(())
 }
 
-pub fn done(id: usize) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-
+pub fn done(conn: &Connection, id: usize) -> anyhow::Result<()> {
     conn.execute("UPDATE todos SET completed = 1 WHERE id = ?1", [id])?;
 
     if conn.changes() == 0 {
@@ -106,9 +115,7 @@ pub fn done(id: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn search(keyword: String) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-
+pub fn search(conn: &Connection, keyword: String) -> anyhow::Result<()> {
     let mut stmt = conn.prepare(
         "SELECT id, title, completed 
          FROM todos 
@@ -116,62 +123,46 @@ pub fn search(keyword: String) -> anyhow::Result<()> {
     )?;
 
     let pattern = format!("%{}%", keyword);
+    let todos: Vec<Todo> = stmt
+        .query_map([pattern], |row| {
+            Ok(Todo {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                completed: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let todos = stmt.query_map([pattern], |row| {
-        Ok(crate::model::Todo {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            completed: row.get(2)?,
-        })
-    })?;
-
-    println!("{}", "🔍 搜索结果:".blue());
-
-    for todo in todos {
-        let todo = todo?;
-        let status = if todo.completed {
-            "✔".green()
-        } else {
-            " ".normal()
-        };
-
-        println!(
-            "[{}] {} - {}",
-            status,
-            todo.id.to_string().cyan(),
-            todo.title
-        );
+    if todos.is_empty() {
+        println!("{}", "🔍 未找到匹配的任务".yellow());
+    } else {
+        println!("{}", "🔍 搜索结果:".blue());
+        print_todos(todos.into_iter());
     }
 
     Ok(())
 }
 
-pub fn export_json(path: String) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-
+pub fn export_json(conn: &Connection, path: String) -> anyhow::Result<()> {
     let mut stmt = conn.prepare("SELECT id, title, completed FROM todos")?;
 
-    let todos = stmt.query_map([], |row| {
-        Ok(Todo {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            completed: row.get(2)?,
-        })
-    })?;
+    let todos: Vec<Todo> = stmt
+        .query_map([], |row| {
+            Ok(Todo {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                completed: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let mut vec = vec![];
-
-    for todo in todos {
-        vec.push(todo?);
-    }
-
-    std::fs::write(&path, serde_json::to_string_pretty(&vec)?)?;
+    std::fs::write(&path, serde_json::to_string_pretty(&todos)?)?;
 
     println!("{}", "📤 导出成功".green());
     Ok(())
 }
 
-pub fn import_json(path: String, preserve_id: bool) -> Result<()> {
+pub fn import_json(conn: &mut Connection, path: String, preserve_id: bool) -> Result<()> {
     let content = std::fs::read_to_string(&path)?;
     let todos: Vec<Todo> = serde_json::from_str(&content)?;
 
@@ -180,7 +171,6 @@ pub fn import_json(path: String, preserve_id: bool) -> Result<()> {
         return Ok(());
     }
 
-    let mut conn = storage::get_connection()?;
     let tx = conn.transaction()?;
 
     tx.execute("DELETE FROM todos", [])?;
@@ -214,9 +204,7 @@ pub fn import_json(path: String, preserve_id: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn delete(id: usize) -> anyhow::Result<()> {
-    let conn = storage::get_connection()?;
-
+pub fn delete(conn: &Connection, id: usize) -> anyhow::Result<()> {
     conn.execute("DELETE FROM todos WHERE id = ?1", [id])?;
 
     if conn.changes() == 0 {
@@ -227,8 +215,7 @@ pub fn delete(id: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn clear() -> anyhow::Result<()> {
-    let mut conn = storage::get_connection()?;
+pub fn clear(conn: &mut Connection) -> anyhow::Result<()> {
     let tx = conn.transaction()?;
 
     tx.execute("DELETE FROM todos", [])?;
@@ -239,8 +226,7 @@ pub fn clear() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn reset() -> anyhow::Result<()> {
-    let mut conn = storage::get_connection()?;
+pub fn reset(conn: &mut Connection) -> anyhow::Result<()> {
     let tx = conn.transaction()?;
 
     tx.execute("DROP TABLE IF EXISTS todos", [])?;
