@@ -1,4 +1,5 @@
 use crate::model::Todo;
+use crate::output::print_todos;
 use anyhow::Result;
 use colored::*;
 use rusqlite::Connection;
@@ -7,42 +8,6 @@ use rusqlite::Connection;
 /// the caller (e.g. `main`) owns the connection. This decouples the
 /// database acquisition from business logic, making the latter
 /// easier to test and swap out.
-
-/// Helper: Print a single todo with colored formatting
-fn print_todo(todo: &Todo) {
-    let status = if todo.completed {
-        "✔".green()
-    } else {
-        " ".normal()
-    };
-
-    let title_display = if todo.completed {
-        todo.title.strikethrough()
-    } else {
-        todo.title.normal()
-    };
-
-    println!(
-        "[{}] {} - {}",
-        status,
-        todo.id.to_string().cyan(),
-        title_display
-    );
-}
-
-/// Helper: Print todos iterator and return (total, completed)
-fn print_todos<I: Iterator<Item = Todo>>(iter: I) -> (usize, usize) {
-    let mut total = 0usize;
-    let mut completed = 0usize;
-
-    for todo in iter {
-        if todo.completed { completed += 1; }
-        total += 1;
-        print_todo(&todo);
-    }
-
-    (total, completed)
-}
 
 pub fn add(conn: &Connection, title: String) -> anyhow::Result<()> {
     conn.execute(

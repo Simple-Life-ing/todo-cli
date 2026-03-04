@@ -1,5 +1,6 @@
 mod cli;
 mod model;
+mod output;
 mod service;
 mod storage;
 
