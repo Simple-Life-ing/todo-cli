@@ -15,13 +15,13 @@ pub fn add(conn: &Connection, title: String) -> anyhow::Result<()> {
         [&title],
     )?;
 
-    println!("✅ 添加成功");
+    println!("✨ {}", "任务已添加".green().bold());
     Ok(())
 }
 
 pub fn batch_add(conn: &mut Connection, titles: Vec<String>) -> anyhow::Result<()> {
     if titles.is_empty() {
-        println!("{}", "⚠️  没有提供任务标题".yellow());
+        println!("⚠️  {}", "没有提供任务标题".yellow().italic());
         return Ok(());
     }
 
@@ -37,7 +37,7 @@ pub fn batch_add(conn: &mut Connection, titles: Vec<String>) -> anyhow::Result<(
 
     tx.commit()?;
 
-    println!("{}", "✅ 批量添加完成".green());
+    println!("✨ {}", "批量任务已添加".green().bold());
     Ok(())
 }
 
@@ -62,8 +62,7 @@ pub fn list(conn: &Connection, show_all: bool) -> anyhow::Result<()> {
     if todos.is_empty() {
         println!("{}", "📭 暂无任务".yellow());
     } else {
-        let (total, completed_count) = print_todos(todos.into_iter());
-        println!("\n{} {}/{}", "完成进度:".blue(), completed_count, total);
+        print_todos(todos.into_iter());
     }
 
     Ok(())
@@ -73,9 +72,9 @@ pub fn done(conn: &Connection, id: usize) -> anyhow::Result<()> {
     conn.execute("UPDATE todos SET completed = 1 WHERE id = ?1", [id])?;
 
     if conn.changes() == 0 {
-        println!("{}", format!("⚠️  ID {} 不存在", id).yellow());
+        println!("⚠️  {}", format!("任务 ID {} 不存在", id).yellow().italic());
     } else {
-        println!("🎉 任务已完成");
+        println!("🎉 {}", "任务完成！".green().bold());
     }
     Ok(())
 }
@@ -99,9 +98,9 @@ pub fn search(conn: &Connection, keyword: String) -> anyhow::Result<()> {
         .collect::<Result<Vec<_>, _>>()?;
 
     if todos.is_empty() {
-        println!("{}", "🔍 未找到匹配的任务".yellow());
+        println!("🔍 {}", "未找到匹配的任务".yellow().italic());
     } else {
-        println!("{}", "🔍 搜索结果:".blue());
+        println!("🔍 {}", "搜索结果:".blue().bold());
         print_todos(todos.into_iter());
     }
 
@@ -123,7 +122,7 @@ pub fn export_json(conn: &Connection, path: String) -> anyhow::Result<()> {
 
     std::fs::write(&path, serde_json::to_string_pretty(&todos)?)?;
 
-    println!("{}", "📤 导出成功".green());
+    println!("📤 {}", "任务已导出".green().bold());
     Ok(())
 }
 
@@ -132,7 +131,7 @@ pub fn import_json(conn: &mut Connection, path: String, preserve_id: bool) -> Re
     let todos: Vec<Todo> = serde_json::from_str(&content)?;
 
     if todos.is_empty() {
-        println!("{}", "文件中没有数据".yellow());
+        println!("⚠️  {}", "文件中没有数据".yellow().italic());
         return Ok(());
     }
 
@@ -165,7 +164,7 @@ pub fn import_json(conn: &mut Connection, path: String, preserve_id: bool) -> Re
 
     tx.commit()?;
 
-    println!("{}", "📥 导入完成".green());
+    println!("📥 {}", "任务已导入".green().bold());
     Ok(())
 }
 
@@ -173,9 +172,9 @@ pub fn delete(conn: &Connection, id: usize) -> anyhow::Result<()> {
     conn.execute("DELETE FROM todos WHERE id = ?1", [id])?;
 
     if conn.changes() == 0 {
-        println!("{}", format!("⚠️  ID {} 不存在", id).yellow());
+        println!("⚠️  {}", format!("任务 ID {} 不存在", id).yellow().italic());
     } else {
-        println!("🗑 删除成功");
+        println!("🗑️ {}", "任务已删除".green().bold());
     }
     Ok(())
 }
@@ -187,7 +186,7 @@ pub fn clear(conn: &mut Connection) -> anyhow::Result<()> {
 
     tx.commit()?; //提交事务
 
-    println!("🧹 已清空");
+    println!("🧹 {}", "所有任务已清空".green().bold());
     Ok(())
 }
 
@@ -207,6 +206,6 @@ pub fn reset(conn: &mut Connection) -> anyhow::Result<()> {
 
     tx.commit()?;
 
-    println!("{}", "🔄 数据库已重置".red());
+    println!("🔄 {}", "数据库已重置".red().bold());
     Ok(())
 }
