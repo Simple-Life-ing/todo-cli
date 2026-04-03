@@ -8,7 +8,6 @@ use rusqlite::Connection;
 /// the caller (e.g. `main`) owns the connection. This decouples the
 /// database acquisition from business logic, making the latter
 /// easier to test and swap out.
-
 pub fn add(conn: &Connection, title: String) -> anyhow::Result<()> {
     conn.execute(
         "INSERT INTO todos (title, completed) VALUES (?1, 0)",
