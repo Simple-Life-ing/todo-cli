@@ -208,3 +208,87 @@ pub fn reset(conn: &mut Connection) -> anyhow::Result<()> {
     println!("🔄 {}", "数据库已重置".red().bold());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn test_connection() -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory sqlite");
+        conn.execute(
+            "CREATE TABLE todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                completed BOOLEAN NOT NULL
+            )",
+            [],
+        )
+        .expect("create todos table");
+        conn
+    }
+
+    fn fetch_todos(conn: &Connection) -> Vec<(usize, String, bool)> {
+        let mut stmt = conn
+            .prepare("SELECT id, title, completed FROM todos ORDER BY id")
+            .expect("prepare select");
+
+        stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .expect("run select")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("collect todos")
+    }
+
+    #[test]
+    fn add_inserts_a_new_todo() {
+        let conn = test_connection();
+
+        add(&conn, "learn ci".to_string()).expect("add todo");
+
+        let todos = fetch_todos(&conn);
+        assert_eq!(todos.len(), 1);
+        assert_eq!(todos[0].1, "learn ci");
+        assert!(!todos[0].2);
+    }
+
+    #[test]
+    fn done_marks_todo_as_completed() {
+        let conn = test_connection();
+        add(&conn, "ship release".to_string()).expect("add todo");
+
+        done(&conn, 1).expect("mark todo done");
+
+        let todos = fetch_todos(&conn);
+        assert_eq!(todos.len(), 1);
+        assert!(todos[0].2);
+    }
+
+    #[test]
+    fn batch_add_inserts_multiple_rows() {
+        let mut conn = test_connection();
+
+        batch_add(
+            &mut conn,
+            vec!["write tests".to_string(), "tag v0.1.0".to_string()],
+        )
+        .expect("batch add");
+
+        let todos = fetch_todos(&conn);
+        assert_eq!(todos.len(), 2);
+        assert_eq!(todos[0].1, "write tests");
+        assert_eq!(todos[1].1, "tag v0.1.0");
+    }
+
+    #[test]
+    fn reset_recreates_the_table() {
+        let mut conn = test_connection();
+        add(&conn, "temporary task".to_string()).expect("add todo");
+
+        reset(&mut conn).expect("reset database");
+
+        let count: usize = conn
+            .query_row("SELECT COUNT(*) FROM todos", [], |row| row.get(0))
+            .expect("count todos");
+        assert_eq!(count, 0);
+    }
+}
